@@ -6,6 +6,10 @@ const dbName = "CNC_GENIE";
 const deviceDataCollectionName = "devicedatas";
 const deviceSettingCollectionName = "Device_setting";
 
+// Track devices that failed too many times
+const deviceNoMissingCount = {};
+const MAX_MISSING_COUNT = 10;
+
 // Subtract one day from a date string (YY/MM/DD)
 function subtractOneDay(dateString) {
   const [yy, mm, dd] = dateString.split("/").map(Number);
@@ -74,10 +78,18 @@ async function processDeviceData() {
 
       for (const doc of documents) {
         const deviceNo = doc.deviceno;
+
+        // Skip device if it has failed too many times
+        if (deviceNoMissingCount[deviceNo] >= MAX_MISSING_COUNT) {
+          console.log(`⏩ Skipping device ${deviceNo} (exceeded ${MAX_MISSING_COUNT} missing counts)`);
+          continue;
+        }
+
         const deviceSettingDoc = await deviceSettingCollection.findOne({ deviceno: deviceNo });
 
         if (!deviceSettingDoc) {
           console.log(`No Device_setting found for device number: ${deviceNo}`);
+          deviceNoMissingCount[deviceNo] = (deviceNoMissingCount[deviceNo] || 0) + 1;
           continue;
         }
 
@@ -157,4 +169,4 @@ setInterval(async () => {
   isRunning = true;
   await processDeviceData();
   isRunning = false;
-}, 30000);
+}, 3000);
